@@ -155,76 +155,66 @@ class _MainBodyState extends State<MainBody> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Flexible(
-                flex: 2,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    _preSetInputField(2, "ip", _ipController),
-                    _preSetInputField(1, "port", _portController),
-                    _preSetInputField(1, "siteId", _siteController),
-                    _preSetInputField(1, "dong", _dongController),
-                    _preSetInputField(1, "ho", _hoController),
-                    _preSetInputField(2, "dbIp", _dbIpController),
-                    _preSetInputField(1, "access_token", _accessTokenController),
-                    ElevatedButton(
-                      onPressed: _getAccessToken,
-                      child: const Text("getToken"),
-                    )
-                  ],
-                )
-            ),
-            Flexible(
-                flex: 8,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 30, bottom: 10),
-                      child: TextField(
-                        controller: _responseDataController,
-                        keyboardType: TextInputType.multiline,
-                        maxLines: 12,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText: "Response Data",
-                        ),
-                      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  _preSetInputField(2, "ip", _ipController),
+                  _preSetInputField(1, "port", _portController),
+                  _preSetInputField(1, "siteId", _siteController),
+                  _preSetInputField(1, "dong", _dongController),
+                  _preSetInputField(1, "ho", _hoController),
+                  _preSetInputField(2, "dbIp", _dbIpController),
+                  _preSetInputField(1, "access_token", _accessTokenController),
+                  ElevatedButton(
+                    onPressed: _getAccessToken,
+                    child: const Text("getToken"),
+                  )
+                ],
+              ),
+              Column(
+                children: [
+                  TextField(
+                    controller: _responseDataController,
+                    keyboardType: TextInputType.multiline,
+                    maxLines: 12,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: "Response Data",
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(left: 10, right: 10),
-                            child: ElevatedButton(
-                              onPressed: _connectServer,
-                              child: const Text("Connect Server"),
-                            ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 10, right: 10),
+                          child: ElevatedButton(
+                            onPressed: _connectServer,
+                            child: const Text("Connect Server"),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 10, right: 10),
-                            child: ElevatedButton(
-                              onPressed: _disConnectServer,
-                              child: const Text("Disconnect Server"),
-                            ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 10, right: 10),
+                          child: ElevatedButton(
+                            onPressed: _disConnectServer,
+                            child: const Text("Disconnect Server"),
                           ),
-                        ],
-                      ),
-                    )
-                  ],
-                ),
-            ),
-            Flexible(
-                flex: 8,
-                child: Column(
-                  children: [
-                    TextField(
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                children: [
+                  TextField(
                       controller: _consoleController,
                       scrollController: _consoleScrollController,
                       keyboardType: TextInputType.multiline,
@@ -234,18 +224,18 @@ class _MainBodyState extends State<MainBody> {
                         border: OutlineInputBorder(),
                         labelText: "Console",
                       )
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: ElevatedButton(
+                      onPressed: _clearConsole,
+                      child: const Text("Clear Console"),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: ElevatedButton(
-                        onPressed: _clearConsole,
-                        child: const Text("Clear Console"),
-                      ),
-                    ),
-                  ],
-                ),
-            ),
-          ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -256,14 +246,11 @@ class _MainBodyState extends State<MainBody> {
         flex: flex,
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: SizedBox(
-            // height: 120,
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                labelText: hint,
-              ),
+          child: TextFormField(
+            controller: controller,
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              labelText: hint,
             ),
           ),
         )
