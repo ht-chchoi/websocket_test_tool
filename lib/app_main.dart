@@ -32,8 +32,17 @@ class MainBody extends StatefulWidget {
 }
 
 class _MainBodyState extends State<MainBody> {
+  // connection State
+  bool _isConnected = false;
+
   // for get AccessToken
   final _tokenUrl = "http://52.79.153.213:18584/oauth/token";
+
+  // validate Keys
+  final Map<String, GlobalKey<FormState>> _validationKeyMap = {
+    "ipValidateKey": GlobalKey<FormState>(),
+    "wallpadConnectionValidationKey": GlobalKey<FormState>()
+  };
 
   // TextField Controllers
   final TextEditingController _ipController = TextEditingController();
@@ -86,19 +95,37 @@ class _MainBodyState extends State<MainBody> {
   }
 
   void _connectServer() {
+    if (!_isValidConnectionInfo()) {
+      _showSimpleDialog("not valid", "Please Check Connection Infos");
+      return;
+    }
+
     String connectionUrl = _createWebsocketUrl();
     _appendConsole("[connectServer] try connection");
 
     _channel = WebSocketChannel.connect(Uri.parse(connectionUrl));
 
     _channel.ready.then((value) => {
-      _appendConsole("[connectServer] Connection Ready")
+      _connectionSuccess()
     });
     
     _channel.stream.listen((message) {
-      // _channel.sink.add('received! $message');
       _handleMessage(message);
     });
+
+    _channel.sink.done.then((value) => {
+      _connectionFail()
+    });
+  }
+
+  void _connectionSuccess() {
+    _appendConsole("[connectServer] Connection Ready! -> Try Auth");
+    _isConnected = true;
+  }
+
+  void _connectionFail() {
+    _appendConsole("[connectServer] Connection Fail(Disconnected)");
+    _isConnected = false;
   }
 
   void _disConnectServer() {
@@ -118,6 +145,33 @@ class _MainBodyState extends State<MainBody> {
         "&targetIp=$targetIp&targetPort=${_portController.text}";
     _appendConsole("[createWebsocketUrl] -> $websocketUrl");
     return websocketUrl;
+  }
+
+  bool _isValidConnectionInfo() {
+    for (var entry in _validationKeyMap.entries) {
+      if (!entry.value.currentState!.validate()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _showSimpleDialog(String title, String message) async {
+    return showDialog(
+        context: context,
+        builder: (builderContext) {
+          return AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              ElevatedButton(
+                  onPressed: () => Navigator.pop(context, 'OK'),
+                  child: const Text("OK")
+              )
+            ],
+          );
+        }
+    );
   }
 
   void _handleMessage(String message) {
@@ -148,6 +202,24 @@ class _MainBodyState extends State<MainBody> {
     _consoleController.text = "clear console ... ";
   }
 
+  String? _validateLocalhost(String? value) {
+    if (value == "127.0.0.1" || value == "localhost") {
+      return "no localhost";
+    }
+
+    if (value == null || !RegExp("^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\$").hasMatch(value)) {
+      return "invalid ip format";
+    }
+
+    return null;
+  }
+
+  String? _validateNotEmpty(String? value) {
+    if (value == null || value.isEmpty) {
+      return "Not Empty";
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -161,21 +233,27 @@ class _MainBodyState extends State<MainBody> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  _preSetInputField(2, "ip", _ipController),
-                  _preSetInputField(1, "port", _portController),
-                  _preSetInputField(1, "siteId", _siteController),
-                  _preSetInputField(1, "dong", _dongController),
-                  _preSetInputField(1, "ho", _hoController),
-                  _preSetInputField(2, "dbIp", _dbIpController),
-                  _preSetInputField(1, "access_token", _accessTokenController),
-                  ElevatedButton(
-                    onPressed: _getAccessToken,
-                    child: const Text("getToken"),
-                  )
-                ],
+              Form(
+                key: _validationKeyMap["wallpadConnectionValidationKey"],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Form(
+                      key: _validationKeyMap["ipValidateKey"],
+                      child: _preSetInputField(2, "ip", _ipController, _validateLocalhost),
+                    ),
+                    _preSetInputField(1, "port", _portController, _validateNotEmpty),
+                    _preSetInputField(1, "siteId", _siteController, _validateNotEmpty),
+                    _preSetInputField(1, "dong", _dongController, _validateNotEmpty),
+                    _preSetInputField(1, "ho", _hoController, _validateNotEmpty),
+                    _preSetInputField(2, "dbIp", _dbIpController, _validateNotEmpty),
+                      _preSetInputField(1, "access_token", _accessTokenController, _validateNotEmpty),
+                    ElevatedButton(
+                        onPressed: _getAccessToken,
+                        child: const Text("getToken"),
+                      )
+                  ],
+                ),
               ),
               Column(
                 children: [
@@ -241,7 +319,24 @@ class _MainBodyState extends State<MainBody> {
     );
   }
 
-  Flexible _preSetInputField(int flex, String hint, TextEditingController controller) {
+  Flexible _preSetInputField(int flex, String hint, TextEditingController controller,
+      Function? validateFunc) {
+    if (validateFunc == null) {
+      return Flexible(
+          flex: flex,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: TextFormField(
+              controller: controller,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                labelText: hint,
+              ),
+            ),
+          ),
+      );
+    }
+
     return Flexible(
         flex: flex,
         child: Padding(
@@ -252,6 +347,10 @@ class _MainBodyState extends State<MainBody> {
               border: const OutlineInputBorder(),
               labelText: hint,
             ),
+            validator: (value) {
+              return validateFunc(value);
+            },
+            autovalidateMode: AutovalidateMode.always,
           ),
         )
     );
