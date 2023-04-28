@@ -32,7 +32,7 @@ class MainBody extends StatefulWidget {
 }
 
 class _MainBodyState extends State<MainBody> {
-  // connection State
+  // State
   bool _isConnected = false;
 
   // for get AccessToken
@@ -43,6 +43,8 @@ class _MainBodyState extends State<MainBody> {
     "ipValidateKey": GlobalKey<FormState>(),
     "wallpadConnectionValidationKey": GlobalKey<FormState>()
   };
+
+  final Map<String, GlobalKey> _buttonKeyMap = {};
 
   // TextField Controllers
   final TextEditingController _ipController = TextEditingController();
@@ -64,15 +66,9 @@ class _MainBodyState extends State<MainBody> {
   @override
   void initState() {
     super.initState();
-    _initTextField();
+    _initWidgets();
     _consoleController.text = "[init] ${widget.title} launch";
-  }
 
-  void _initTextField() {
-    _ipController.text = "172.20.200.200";
-    _portController.text = "30002";
-    _siteController.text = "8";
-    _responseDataController.text = "{\"result\": 200}";
   }
 
   void _getAccessToken() async {
@@ -119,18 +115,23 @@ class _MainBodyState extends State<MainBody> {
   }
 
   void _connectionSuccess() {
-    _appendConsole("[connectServer] Connection Ready! -> Try Auth");
+    _appendConsole("[connectServer] Connection Ready!");
     _isConnected = true;
+    _refreshConnectionButtons();
   }
 
   void _connectionFail() {
     _appendConsole("[connectServer] Connection Fail(Disconnected)");
     _isConnected = false;
+    _refreshConnectionButtons();
   }
 
   void _disConnectServer() {
     _appendConsole("[disConnectServer] close connect");
     _channel.sink.close(status.normalClosure);
+
+    _isConnected = false;
+    _refreshConnectionButtons();
   }
 
   String _createWebsocketUrl() {
@@ -221,6 +222,7 @@ class _MainBodyState extends State<MainBody> {
     return null;
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -273,17 +275,11 @@ class _MainBodyState extends State<MainBody> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.only(left: 10, right: 10),
-                          child: ElevatedButton(
-                            onPressed: _connectServer,
-                            child: const Text("Connect Server"),
-                          ),
+                          child: _connectButton,
                         ),
                         Padding(
                           padding: const EdgeInsets.only(left: 10, right: 10),
-                          child: ElevatedButton(
-                            onPressed: _disConnectServer,
-                            child: const Text("Disconnect Server"),
-                          ),
+                          child: _disConnectButton,
                         ),
                       ],
                     ),
@@ -317,6 +313,36 @@ class _MainBodyState extends State<MainBody> {
         ),
       ),
     );
+  }
+
+  late ElevatedButton _connectButton;
+  late ElevatedButton _disConnectButton;
+
+  void _initWidgets() {
+    _initTextField();
+    _refreshConnectionButtons();
+  }
+
+  void _refreshConnectionButtons() {
+    setState(() {
+      _connectButton = ElevatedButton(
+        key: UniqueKey(),
+        onPressed: _isConnected ? null : _connectServer,
+        child: const Text("Connect Server"),
+      );
+      _disConnectButton = ElevatedButton(
+        key: UniqueKey(),
+        onPressed: _isConnected ? _disConnectServer : null,
+        child: const Text("Disconnect Server"),
+      );
+    });
+  }
+
+  void _initTextField() {
+    _ipController.text = "172.20.200.200";
+    _portController.text = "30002";
+    _siteController.text = "8";
+    _responseDataController.text = "{\"result\": 200}";
   }
 
   Flexible _preSetInputField(int flex, String hint, TextEditingController controller,
