@@ -90,6 +90,38 @@ class _MainBodyState extends State<MainBody> {
     }
   }
 
+  void _getDbIp() async {
+    if (_accessTokenController.text.isEmpty) {
+      _showSimpleDialog("alert", "need AccessToken");
+      return;
+    }
+
+    if (_ipController.text.isEmpty || _siteController.text.isEmpty || _dongController.text.isEmpty || _hoController.text.isEmpty) {
+      _showSimpleDialog("alert", "need Household Info [ip, siteId, dong, ho]");
+      return;
+    }
+
+    final donghoWallpadUrl = "http://192.168.2.89:41234/dongho/wallpad?siteId=${_siteController.text}&dong=${_dongController.text}&ho=${_hoController.text}&access_token=${_accessTokenController.text}&targetIp=${_ipController.text}&targetPort=30001";
+    _appendConsole("[getAccessToken] GET $donghoWallpadUrl");
+    Response response;
+    try {
+      response = await Dio().get(donghoWallpadUrl);
+    } catch (e) {
+      _appendConsole("fail to get DBIP");
+      return;
+    }
+    _appendConsole("[response getDonghoWallpad] status=${response.statusCode}");
+
+    if (response.statusCode == 200) {
+      Map responseBody = Map.from(response.data);
+      List<dynamic> wallpadList = responseBody["wallpadList"];
+      Map<String, dynamic> wallpadInfo = wallpadList[0];
+      String ipAddress = wallpadInfo["ipAddress"];
+      _dbIpController.text = ipAddress;
+      _appendConsole("[response getDonghoWallpad] set DBIP: $ipAddress");
+    }
+  }
+
   void _connectServer() {
     if (!_isValidConnectionInfo()) {
       _showSimpleDialog("not valid", "Please Check Connection Infos");
@@ -136,10 +168,6 @@ class _MainBodyState extends State<MainBody> {
 
   String _createWebsocketUrl() {
     String targetIp = _ipController.text;
-    if (targetIp == "127.0.0.1") {
-
-    }
-
     String websocketUrl = "ws://192.168.2.89:41234/wallpad/"
         "${_dongController.text}/${_hoController.text}/1?siteId=${_siteController.text}"
         "&version=1&ip=${_dbIpController.text}&id=1&access_token=${_accessTokenController.text}"
@@ -249,11 +277,15 @@ class _MainBodyState extends State<MainBody> {
                     _preSetInputField(1, "dong", _dongController, _validateNotEmpty),
                     _preSetInputField(1, "ho", _hoController, _validateNotEmpty),
                     _preSetInputField(2, "dbIp", _dbIpController, _validateNotEmpty),
-                      _preSetInputField(1, "access_token", _accessTokenController, _validateNotEmpty),
+                    ElevatedButton(
+                      onPressed: _getDbIp,
+                      child: const Text("getDBIP"),
+                    ),
+                    _preSetInputField(1, "access_token", _accessTokenController, _validateNotEmpty),
                     ElevatedButton(
                         onPressed: _getAccessToken,
                         child: const Text("getToken"),
-                      )
+                      ),
                   ],
                 ),
               ),
