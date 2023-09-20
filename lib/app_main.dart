@@ -34,6 +34,12 @@ class MainBody extends StatefulWidget {
 class _MainBodyState extends State<MainBody> {
   // State
   bool _isConnected = false;
+  String _dbIp = "{init}";
+  String _accessToken = "{init}";
+  String _selectedMode = "wallpad";
+
+  // for mode select
+  final _modeList = ['wallpad', 'lobby'];
 
   // for get AccessToken
   final _tokenUrl = "http://52.79.153.213:18584/oauth/token";
@@ -52,8 +58,7 @@ class _MainBodyState extends State<MainBody> {
   final TextEditingController _siteController = TextEditingController();
   final TextEditingController _dongController = TextEditingController();
   final TextEditingController _hoController = TextEditingController();
-  final TextEditingController _dbIpController = TextEditingController();
-  final TextEditingController _accessTokenController = TextEditingController();
+  final TextEditingController _lobbyNumController = TextEditingController();
 
   final TextEditingController _responseDataController = TextEditingController();
 
@@ -71,11 +76,16 @@ class _MainBodyState extends State<MainBody> {
 
   }
 
-  void _getAccessToken() async {
+  Future<bool> _getAccessToken() async {
+    if (_accessToken != "{init}") {
+      _appendConsole("[getAccessToken] use cached accessToken: $_accessToken");
+      return true;
+    }
+
     _appendConsole("[getAccessToken] POST http://52.79.153.213:18584/oauth/token");
     Response response = await Dio().post(
       _tokenUrl,
-      data: {"username": "labs_team","password": "abcd"},
+      data: {"username": "server_team_test","password": "1q2w3e4r!"},
       options: Options(
         headers: {
           Headers.contentTypeHeader: Headers.jsonContentType
@@ -86,29 +96,37 @@ class _MainBodyState extends State<MainBody> {
 
     if (response.statusCode == 200) {
       Map responseBody = Map.from(response.data);
-      _accessTokenController.text = responseBody["access_token"] as String;
+      _accessToken = responseBody["access_token"] as String;
+      return true;
     }
+    return false;
   }
 
-  void _getDbIp() async {
-    if (_accessTokenController.text.isEmpty) {
-      _showSimpleDialog("alert", "need AccessToken");
-      return;
+  Future<bool> _getDbIp() async {
+    if (_selectedMode == 'wallpad') {
+      return _getWallpadIp();
+    } else if (_selectedMode == 'lobby') {
+      return _getLobbyIp();
     }
+    _appendConsole("mode select fail");
+    return false;
+  }
 
+  Future<bool> _getWallpadIp() async {
     if (_ipController.text.isEmpty || _siteController.text.isEmpty || _dongController.text.isEmpty || _hoController.text.isEmpty) {
       _showSimpleDialog("alert", "need Household Info [ip, siteId, dong, ho]");
-      return;
+      return false;
     }
 
-    final donghoWallpadUrl = "http://192.168.2.89:41234/dongho/wallpad?siteId=${_siteController.text}&dong=${_dongController.text}&ho=${_hoController.text}&access_token=${_accessTokenController.text}&targetIp=${_ipController.text}&targetPort=30001";
-    _appendConsole("[getAccessToken] GET $donghoWallpadUrl");
+    await _getAccessToken();
+    final donghoWallpadUrl = "http://192.168.2.89:41234/dongho/wallpad?siteId=${_siteController.text}&dong=${_dongController.text}&ho=${_hoController.text}&access_token=$_accessToken&targetIp=${_ipController.text}&targetPort=30001";
+    _appendConsole("[_getWallpadIp] GET $donghoWallpadUrl");
     Response response;
     try {
       response = await Dio().get(donghoWallpadUrl);
     } catch (e) {
       _appendConsole("fail to get DBIP");
-      return;
+      return false;
     }
     _appendConsole("[response getDonghoWallpad] status=${response.statusCode}");
 
@@ -117,14 +135,55 @@ class _MainBodyState extends State<MainBody> {
       List<dynamic> wallpadList = responseBody["wallpadList"];
       Map<String, dynamic> wallpadInfo = wallpadList[0];
       String ipAddress = wallpadInfo["ipAddress"];
-      _dbIpController.text = ipAddress;
+      _dbIp = ipAddress;
       _appendConsole("[response getDonghoWallpad] set DBIP: $ipAddress");
     }
+    return true;
   }
 
-  void _connectServer() {
+  Future<bool> _getLobbyIp() async {
+    if (_ipController.text.isEmpty || _siteController.text.isEmpty || _lobbyNumController.text.isEmpty) {
+      _showSimpleDialog("alert", "need lobby Info [ip, siteId, lobbyNum]");
+      return false;
+    }
+
+    await _getAccessToken();
+    final getlobbyUrl = "http://192.168.2.89:41234/lobby?siteId=${_siteController.text}&lobbyNo=${_lobbyNumController.text}&access_token=$_accessToken&targetIp=${_ipController.text}&targetPort=30001";
+    _appendConsole("[_getLobbyIp] GET $getlobbyUrl");
+    Response response;
+    try {
+      response = await Dio().get(getlobbyUrl);
+    } catch (e) {
+      _appendConsole("fail to get lobbyIP");
+      return false;
+    }
+    _appendConsole("[response _getLobbyIp] status=${response.statusCode}");
+
+    if (response.statusCode == 200) {
+      Map responseBody = Map.from(response.data);
+      String ipAddress = responseBody["ipAddress"];
+      _dbIp = ipAddress;
+      _appendConsole("[response _getLobbyIp] set DBIP: $ipAddress");
+    }
+    return true;
+  }
+
+  void _connectServer() async {
+    _appendConsole("Current Mode: $_selectedMode");
+
     if (!_isValidConnectionInfo()) {
       _showSimpleDialog("not valid", "Please Check Connection Infos");
+      return;
+    }
+
+    bool isValidToken = await _getAccessToken();
+    if (!isValidToken) {
+      _showSimpleDialog("not valid", "Fail to get AccessToken");
+      return;
+    }
+    bool isValidDbIp = await _getDbIp();
+    if (!isValidDbIp) {
+      _showSimpleDialog("not valid", "Fail to get targetIp\nPleas check Dong, ho or lobbyNum");
       return;
     }
 
@@ -168,12 +227,23 @@ class _MainBodyState extends State<MainBody> {
 
   String _createWebsocketUrl() {
     String targetIp = _ipController.text;
-    String websocketUrl = "ws://192.168.2.89:41234/wallpad/"
-        "${_dongController.text}/${_hoController.text}/1?siteId=${_siteController.text}"
-        "&version=1&ip=${_dbIpController.text}&id=1&access_token=${_accessTokenController.text}"
-        "&targetIp=$targetIp&targetPort=${_portController.text}";
-    _appendConsole("[createWebsocketUrl] -> $websocketUrl");
-    return websocketUrl;
+    if (_selectedMode == 'wallpad') {
+      String websocketUrl = "ws://192.168.2.89:41234/wallpad/"
+          "${_dongController.text}/${_hoController.text}/1?siteId=${_siteController.text}"
+          "&version=1&ip=$_dbIp&id=1&access_token=$_accessToken"
+          "&targetIp=$targetIp&targetPort=${_portController.text}";
+      _appendConsole("[createWebsocketUrl] -> $websocketUrl");
+      return websocketUrl;
+    } else if (_selectedMode == 'lobby') {
+      String websocketUrl = "ws://192.168.2.89:41234/lobby/"
+          "${_lobbyNumController.text}?siteId=${_siteController.text}"
+          "&version=1&ip=$_dbIp&id=1&access_token=$_accessToken"
+          "&targetIp=$targetIp&targetPort=${_portController.text}";
+      _appendConsole("[createWebsocketUrl] -> $websocketUrl");
+      return websocketUrl;
+    }
+
+    return "null";
   }
 
   bool _isValidConnectionInfo() {
@@ -270,22 +340,13 @@ class _MainBodyState extends State<MainBody> {
                   children: [
                     Form(
                       key: _validationKeyMap["ipValidateKey"],
-                      child: _preSetInputField(2, "ip", _ipController, _validateLocalhost),
+                      child: _preSetInputField(1, "ip", _ipController, _validateLocalhost),
                     ),
                     _preSetInputField(1, "port", _portController, _validateNotEmpty),
                     _preSetInputField(1, "siteId", _siteController, _validateNotEmpty),
                     _preSetInputField(1, "dong", _dongController, _validateNotEmpty),
                     _preSetInputField(1, "ho", _hoController, _validateNotEmpty),
-                    _preSetInputField(2, "dbIp", _dbIpController, _validateNotEmpty),
-                    ElevatedButton(
-                      onPressed: _getDbIp,
-                      child: const Text("getDBIP"),
-                    ),
-                    _preSetInputField(1, "access_token", _accessTokenController, _validateNotEmpty),
-                    ElevatedButton(
-                        onPressed: _getAccessToken,
-                        child: const Text("getToken"),
-                      ),
+                    _preSetInputField(1, "lobbyNum", _lobbyNumController, _validateNotEmpty),
                   ],
                 ),
               ),
@@ -305,6 +366,19 @@ class _MainBodyState extends State<MainBody> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 10, right: 10),
+                          child: DropdownButton(
+                              value: _selectedMode,
+                              items: _modeList
+                                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedMode = value!;
+                                });
+                              }),
+                        ),
                         Padding(
                           padding: const EdgeInsets.only(left: 10, right: 10),
                           child: _connectButton,
@@ -374,6 +448,9 @@ class _MainBodyState extends State<MainBody> {
     _ipController.text = "172.20.200.200";
     _portController.text = "30002";
     _siteController.text = "8";
+    _dongController.text = "101";
+    _hoController.text = "101";
+    _lobbyNumController.text = "1";
     _responseDataController.text = "{\"result\": 200}";
   }
 
